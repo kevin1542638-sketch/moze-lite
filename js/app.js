@@ -7,6 +7,12 @@
   function $el(sel) { return document.querySelector(sel); }
   function $$el(sel) { return document.querySelectorAll(sel); }
 
+  /* ─── XSS 防護 ─── */
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   /* ─── 前置檢查 ─── */
   if (typeof MozeData === 'undefined' || typeof MozeCharts === 'undefined') {
     document.body.innerHTML = '<div style="padding:40px;color:#e57373;font-size:18px">錯誤：MozeData 或 MozeCharts 未載入，請確認 JS 檔案引入順序。</div>';
@@ -161,13 +167,13 @@
     list.innerHTML = s.upcoming.sort((a, b) => a.nextDate.localeCompare(b.nextDate)).map(u => `
       <div class="upcoming-item">
         <div class="upcoming-info">
-          <span>${u.title || '提醒'}</span>
-          <span class="upcoming-date">${u.nextDate} · ${MozeData.acctName(u.accountId)}</span>
+          <span>${esc(u.title) || '提醒'}</span>
+          <span class="upcoming-date">${esc(u.nextDate)} · ${esc(MozeData.acctName(u.accountId))}</span>
         </div>
         <span class="upcoming-amount" style="color:${u.type === 'income' ? 'var(--green)' : 'var(--red)'}">
           ${u.type === 'income' ? '+' : '-'}${MozeData.formatMoney(u.amount)}
         </span>
-        <button class="btn-icon" data-del-up="${u.id}" title="刪除">✕</button>
+        <button class="btn-icon" data-del-up="${esc(u.id)}" title="刪除">✕</button>
       </div>
     `).join('');
     list.querySelectorAll('[data-del-up]').forEach(btn => {
@@ -196,12 +202,12 @@
       MozeData.ACCOUNT_GROUPS.forEach(g => {
         const accs = s.accounts.filter(a => a.group === g);
         if (!accs.length) return;
-        html += `<div class="account-group-title">${g}</div>`;
+        html += `<div class="account-group-title">${esc(g)}</div>`;
         accs.forEach(a => {
           const bal = MozeData.accountBalance(a.id);
           const sel = a.id === s.selectedAccountId ? ' selected' : '';
-          html += `<div class="account-list-item${sel}" data-acc-id="${a.id}">
-            <span class="acc-name"><span>${a.icon}</span> ${a.name}</span>
+          html += `<div class="account-list-item${sel}" data-acc-id="${esc(a.id)}">
+            <span class="acc-name"><span>${esc(a.icon)}</span> ${esc(a.name)}</span>
             <span class="acc-balance" style="color:${bal >= 0 ? 'var(--green)' : 'var(--red)'}">${MozeData.formatMoney(bal)}</span>
           </div>`;
         });
@@ -349,7 +355,7 @@
         rankTable.innerHTML = '<p style="color:var(--text-muted)">無資料</p>';
       } else {
         rankTable.innerHTML = `<table class="rank-table"><thead><tr><th>#</th><th>分類</th><th>金額</th><th>占比</th></tr></thead><tbody>
-          ${top10.map((d, i) => `<tr><td class="rank-num">${i + 1}</td><td>${d.icon} ${d.name}</td><td>${MozeData.formatMoney(d.amount)}</td><td class="rank-pct">${(d.pct * 100).toFixed(1)}%</td></tr>`).join('')}
+          ${top10.map((d, i) => `<tr><td class="rank-num">${i + 1}</td><td>${esc(d.icon)} ${esc(d.name)}</td><td>${MozeData.formatMoney(d.amount)}</td><td class="rank-pct">${(d.pct * 100).toFixed(1)}%</td></tr>`).join('')}
         </tbody></table>`;
       }
     }
@@ -419,9 +425,9 @@
         list.innerHTML = '<div class="empty-state"><p>尚無專案</p></div>';
       } else {
         list.innerHTML = s.projects.map(p => `
-          <div class="project-list-item${p.id === selectedProjectId ? ' selected' : ''}" data-proj-id="${p.id}">
-            <span>${p.icon} ${p.name}</span>
-            <button class="btn-icon" data-del-proj="${p.id}" title="刪除">✕</button>
+          <div class="project-list-item${p.id === selectedProjectId ? ' selected' : ''}" data-proj-id="${esc(p.id)}">
+            <span>${esc(p.icon)} ${esc(p.name)}</span>
+            <button class="btn-icon" data-del-proj="${esc(p.id)}" title="刪除">✕</button>
           </div>
         `).join('');
         list.querySelectorAll('.project-list-item').forEach(el => {
@@ -463,7 +469,7 @@
       return;
     }
 
-    if (header) header.innerHTML = `${proj.icon} ${proj.name}`;
+    if (header) header.innerHTML = `${esc(proj.icon)} ${esc(proj.name)}`;
 
     const txs = s.transactions.filter(t => t.projectId === proj.id);
     const inflow = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -500,7 +506,7 @@
           const pct = Math.min(100, (spent / (b.limitMonthly || 1)) * 100);
           const over = spent > b.limitMonthly;
           return `<div class="budget-row">
-            <span style="width:70px;font-size:13px">${MozeData.catIcon(b.categoryId)} ${MozeData.catName(b.categoryId)}</span>
+            <span style="width:70px;font-size:13px">${esc(MozeData.catIcon(b.categoryId))} ${esc(MozeData.catName(b.categoryId))}</span>
             <div class="budget-progress"><div class="budget-progress-bar${over ? ' over' : ''}" style="width:${pct}%"></div></div>
             <span style="font-size:12px;min-width:100px;text-align:right">${MozeData.formatMoney(spent)} / ${MozeData.formatMoney(b.limitMonthly)}</span>
             <button class="btn-icon" data-del-budget="${b.id}">✕</button>
@@ -562,9 +568,9 @@
     if (catList) {
       catList.innerHTML = s.categories.map(c => `
         <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-          <span style="font-size:18px">${c.icon}</span>
-          <span style="flex:1">${c.name}</span>
-          <button class="btn-icon" data-del-cat="${c.id}" title="刪除">✕</button>
+          <span style="font-size:18px">${esc(c.icon)}</span>
+          <span style="flex:1">${esc(c.name)}</span>
+          <button class="btn-icon" data-del-cat="${esc(c.id)}" title="刪除">✕</button>
         </div>
       `).join('');
       catList.querySelectorAll('[data-del-cat]').forEach(btn => {
@@ -603,34 +609,34 @@
   /*           交易項目 HTML                  */
   /* ═══════════════════════════════════════ */
   function txItemHTML(t) {
-    let icon = MozeData.catIcon(t.categoryId);
-    let titleText = t.title || MozeData.catName(t.categoryId);
+    let icon = esc(MozeData.catIcon(t.categoryId));
+    let titleText = esc(t.title || MozeData.catName(t.categoryId));
     let amountClass = t.type;
     let amountPrefix = t.type === 'income' ? '+' : (t.type === 'expense' ? '-' : '');
     let extra = '';
 
     if (t.type === 'transfer') {
       icon = '🔄';
-      titleText = t.title || `${MozeData.acctName(t.accountId)} → ${MozeData.acctName(t.toAccountId)}`;
+      titleText = esc(t.title) || `${esc(MozeData.acctName(t.accountId))} → ${esc(MozeData.acctName(t.toAccountId))}`;
       amountPrefix = '';
       if (t.fee > 0) extra = ` <span style="font-size:11px;color:var(--text-muted)">(手續費 ${MozeData.formatMoney(t.fee)})</span>`;
     }
 
-    const tagsHtml = (t.tags || []).map(tag => `<span class="tx-tag">${tag}</span>`).join('');
+    const tagsHtml = (t.tags || []).map(tag => `<span class="tx-tag">${esc(tag)}</span>`).join('');
 
     return `<div class="tx-item">
       <div class="tx-icon">${icon}</div>
       <div class="tx-info">
         <div class="tx-title">${titleText}</div>
         <div class="tx-meta">
-          <span>${t.date} ${t.time || ''}</span>
-          ${t.note ? `<span>${t.note}</span>` : ''}
-          <span>${MozeData.acctName(t.accountId)}</span>
+          <span>${esc(t.date)} ${esc(t.time || '')}</span>
+          ${t.note ? `<span>${esc(t.note)}</span>` : ''}
+          <span>${esc(MozeData.acctName(t.accountId))}</span>
           ${tagsHtml}
         </div>
       </div>
       <span class="tx-amount ${amountClass}">${amountPrefix}${MozeData.formatMoney(t.amount)}${extra}</span>
-      <button class="tx-delete" data-del-tx="${t.id}" title="刪除">✕</button>
+      <button class="tx-delete" data-del-tx="${esc(t.id)}" title="刪除">✕</button>
     </div>`;
   }
 
@@ -656,7 +662,7 @@
     const cur = sel.value;
     let html = withAll ? '<option value="all">全部帳戶</option>' : '';
     s.accounts.forEach(a => {
-      html += `<option value="${a.id}"${a.id === cur ? ' selected' : ''}>${a.icon} ${a.name}</option>`;
+      html += `<option value="${esc(a.id)}"${a.id === cur ? ' selected' : ''}>${esc(a.icon)} ${esc(a.name)}</option>`;
     });
     sel.innerHTML = html;
   }
@@ -667,7 +673,7 @@
     const s = MozeData.getState();
     const cur = sel.value;
     sel.innerHTML = s.categories.map(c =>
-      `<option value="${c.id}"${c.id === cur ? ' selected' : ''}>${c.icon} ${c.name}</option>`
+      `<option value="${esc(c.id)}"${c.id === cur ? ' selected' : ''}>${esc(c.icon)} ${esc(c.name)}</option>`
     ).join('');
   }
 
@@ -677,7 +683,7 @@
     const s = MozeData.getState();
     const cur = sel.value;
     sel.innerHTML = '<option value="">無</option>' + s.projects.map(p =>
-      `<option value="${p.id}"${p.id === cur ? ' selected' : ''}>${p.icon} ${p.name}</option>`
+      `<option value="${esc(p.id)}"${p.id === cur ? ' selected' : ''}>${esc(p.icon)} ${esc(p.name)}</option>`
     ).join('');
   }
 
