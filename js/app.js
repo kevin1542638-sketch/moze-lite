@@ -1033,18 +1033,6 @@
     if (appLayout) appLayout.style.display = 'none';
   }
 
-  /* ─── 登入按鈕 ─── */
-  const btnGoogleLogin = $('btn-google-login');
-  if (btnGoogleLogin) {
-    btnGoogleLogin.addEventListener('click', function () {
-      const hint = $('login-hint');
-      if (hint) hint.textContent = '正在跳轉…';
-      MozeSync.signInWithGoogle().catch(function (e) {
-        if (hint) hint.textContent = '登入失敗：' + e.message;
-      });
-    });
-  }
-
   /* ─── 登出按鈕 ─── */
   const btnLogout = $('btn-logout');
   if (btnLogout) {
@@ -1053,7 +1041,7 @@
     });
   }
 
-  /* ─── 監聽登入狀態 ─── */
+  /* ─── 監聽登入狀態 + 初始化 GIS 按鈕 ─── */
   if (typeof MozeSync !== 'undefined') {
     MozeSync.onAuthChanged(function (user) {
       if (user) {
@@ -1061,6 +1049,7 @@
         MozeSync.startSync(user.uid);
       } else {
         showLogin();
+        MozeSync.initGoogleSignIn();
       }
     });
   } else {

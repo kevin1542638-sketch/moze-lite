@@ -1,4 +1,4 @@
-/* ===== sync.js — Firebase Auth + Realtime Database 即時同步 ===== */
+/* ===== sync.js — Google Identity Services + Firebase Auth + Realtime DB ===== */
 'use strict';
 
 var MozeSync = (function () {
@@ -10,7 +10,8 @@ var MozeSync = (function () {
     projectId: 'moze-lite',
   };
 
-  var app = null;
+  var GOOGLE_CLIENT_ID = '721616309882-7o6u74re11djphai6j0dgpq42ki3agtr.apps.googleusercontent.com';
+
   var auth = null;
   var db = null;
   var dataRef = null;
@@ -22,10 +23,7 @@ var MozeSync = (function () {
 
   function setStatus(text, color) {
     if (!statusEl) statusEl = document.getElementById('sync-status');
-    if (statusEl) {
-      statusEl.textContent = text;
-      statusEl.style.color = color || '#8e8e96';
-    }
+    if (statusEl) { statusEl.textContent = text; statusEl.style.color = color || '#8e8e96'; }
   }
 
   function setLoginHint(text) {
@@ -33,47 +31,74 @@ var MozeSync = (function () {
     if (el) el.textContent = text;
   }
 
+  /* ─── Firebase 初始化 ─── */
   function initFirebase() {
     if (initialized) return;
-    if (typeof firebase === 'undefined') {
-      setLoginHint('Firebase SDK 載入失敗');
-      return;
-    }
-    app = firebase.initializeApp(FIREBASE_CONFIG);
+    if (typeof firebase === 'undefined') { setLoginHint('Firebase SDK 載入失敗'); return; }
+    firebase.initializeApp(FIREBASE_CONFIG);
     auth = firebase.auth();
     db = firebase.database();
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     initialized = true;
   }
 
-  function signInWithGoogle() {
+  /* ─── Google Identity Services 登入 ─── */
+  function initGoogleSignIn() {
+    if (typeof google === 'undefined' || !google.accounts) {
+      setTimeout(initGoogleSignIn, 300);
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: onGoogleCredential,
+      auto_select: true,
+    });
+    var btnEl = document.getElementById('google-signin-btn');
+    if (btnEl) {
+      google.accounts.id.renderButton(btnEl, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'rectangular',
+        text: 'signin_with',
+        locale: 'zh-TW',
+        width: 280,
+      });
+    }
+  }
+
+  function onGoogleCredential(response) {
     initFirebase();
-    var provider = new firebase.auth.GoogleAuthProvider();
+    if (!auth) { setLoginHint('Firebase 初始化失敗'); return; }
     setLoginHint('正在登入…');
-    return auth.signInWithPopup(provider).then(function () {
-      setLoginHint('登入成功！');
+    var credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    auth.signInWithCredential(credential).then(function () {
+      setLoginHint('');
     }).catch(function (err) {
-      console.warn('login error:', err.code, err.message);
-      setLoginHint('登入失敗：' + (err.code || '') + '\n' + (err.message || ''));
+      setLoginHint('登入失敗：' + (err.code || '') + ' ' + (err.message || ''));
     });
   }
 
+  /* ─── 登出 ─── */
   function signOut() {
     stopSync();
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.id.disableAutoSelect();
+    }
     if (auth) return auth.signOut();
     return Promise.resolve();
   }
 
+  /* ─── Auth 狀態監聽 ─── */
   function onAuthChanged(callback) {
     initFirebase();
     if (!auth) { setLoginHint('Firebase 初始化失敗'); return; }
-
     auth.onAuthStateChanged(function (user) {
       if (user) { setLoginHint(''); }
       callback(user);
     });
   }
 
+  /* ─── 即時同步 ─── */
   function startSync(uid) {
     if (dataRef) stopSync();
     dataRef = db.ref('users/' + uid + '/moze-data');
@@ -105,10 +130,7 @@ var MozeSync = (function () {
   }
 
   function stopSync() {
-    if (dataRef) {
-      try { dataRef.off(); } catch (e) {}
-      dataRef = null;
-    }
+    if (dataRef) { try { dataRef.off(); } catch (e) {} dataRef = null; }
   }
 
   function onRemoteChange(snapshot) {
@@ -116,10 +138,8 @@ var MozeSync = (function () {
     var data = snapshot.val();
     if (!data) return;
     syncing = true;
-    try {
-      MozeData.replaceState(data);
-      setStatus('已同步 ✓', '#81c784');
-    } catch (e) { console.warn('sync apply error', e); }
+    try { MozeData.replaceState(data); setStatus('已同步 ✓', '#81c784'); }
+    catch (e) { console.warn('sync error', e); }
     setTimeout(function () {
       syncing = false;
       if (typeof window.mozeRefreshAll === 'function') {
@@ -132,15 +152,12 @@ var MozeSync = (function () {
     if (!dataRef || syncing) return;
     var state = MozeData.getState();
     if (!state) return;
-    var payload = JSON.parse(JSON.stringify(state));
     syncing = true;
     setStatus('同步中…', '#f6c342');
-    dataRef.set(payload).then(function () {
-      syncing = false;
-      setStatus('已同步 ✓', '#81c784');
+    dataRef.set(JSON.parse(JSON.stringify(state))).then(function () {
+      syncing = false; setStatus('已同步 ✓', '#81c784');
     }).catch(function () {
-      syncing = false;
-      setStatus('同步失敗', '#e57373');
+      syncing = false; setStatus('同步失敗', '#e57373');
     });
   }
 
@@ -152,7 +169,7 @@ var MozeSync = (function () {
 
   return {
     initFirebase: initFirebase,
-    signInWithGoogle: signInWithGoogle,
+    initGoogleSignIn: initGoogleSignIn,
     signOut: signOut,
     onAuthChanged: onAuthChanged,
     startSync: startSync,
