@@ -3,15 +3,13 @@
 
 var MozeSync = (function () {
 
-  /* ─── Firebase 設定 ─── */
   var FIREBASE_CONFIG = {
     apiKey: 'AIzaSyAEbehc911kz5Uvx7D4DQ6pAcqN7lPQgpg',
-    authDomain: 'moze-lite.firebaseapp.com',
+    authDomain: 'kevin1542638-sketch.github.io',
     databaseURL: 'https://moze-lite-default-rtdb.firebaseio.com',
     projectId: 'moze-lite',
   };
 
-  /* ─── 狀態 ─── */
   var app = null;
   var auth = null;
   var db = null;
@@ -20,6 +18,7 @@ var MozeSync = (function () {
   var pushTimer = null;
   var statusEl = null;
   var initialized = false;
+  var saveBound = false;
 
   function setStatus(text, color) {
     if (!statusEl) statusEl = document.getElementById('sync-status');
@@ -29,11 +28,15 @@ var MozeSync = (function () {
     }
   }
 
-  /* ─── 初始化 Firebase ─── */
+  function setLoginHint(text) {
+    var el = document.getElementById('login-hint');
+    if (el) el.textContent = text;
+  }
+
   function initFirebase() {
     if (initialized) return;
     if (typeof firebase === 'undefined') {
-      console.warn('Firebase SDK not loaded');
+      setLoginHint('Firebase SDK 載入失敗');
       return;
     }
     app = firebase.initializeApp(FIREBASE_CONFIG);
@@ -43,17 +46,16 @@ var MozeSync = (function () {
     initialized = true;
   }
 
-  /* ─── 登入 / 登出 ─── */
   function signInWithGoogle() {
     initFirebase();
     var provider = new firebase.auth.GoogleAuthProvider();
-    if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
-      return auth.signInWithRedirect(provider);
-    }
+    setLoginHint('正在跳轉…');
     return auth.signInWithPopup(provider).catch(function (err) {
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' ||
+          err.code === 'auth/operation-not-supported-in-this-environment') {
         return auth.signInWithRedirect(provider);
       }
+      setLoginHint('登入失敗：' + err.message);
       throw err;
     });
   }
@@ -64,15 +66,23 @@ var MozeSync = (function () {
     return Promise.resolve();
   }
 
-  /* ─── Auth 狀態監聽 ─── */
   function onAuthChanged(callback) {
     initFirebase();
+    if (!auth) return;
+
+    auth.getRedirectResult().then(function (result) {
+      if (result && result.user) {
+        callback(result.user);
+      }
+    }).catch(function (err) {
+      setLoginHint('登入失敗：' + err.message);
+    });
+
     auth.onAuthStateChanged(function (user) {
       callback(user);
     });
   }
 
-  /* ─── 同步 ─── */
   function startSync(uid) {
     if (dataRef) stopSync();
     dataRef = db.ref('users/' + uid + '/moze-data');
@@ -91,14 +101,16 @@ var MozeSync = (function () {
       } else {
         pushNow();
       }
-
       dataRef.on('value', onRemoteChange);
     }).catch(function () {
       setStatus('連線失敗', '#e57373');
       dataRef.on('value', onRemoteChange);
     });
 
-    MozeData.onSave(debouncedPush);
+    if (!saveBound) {
+      saveBound = true;
+      MozeData.onSave(debouncedPush);
+    }
   }
 
   function stopSync() {
@@ -112,15 +124,11 @@ var MozeSync = (function () {
     if (syncing) return;
     var data = snapshot.val();
     if (!data) return;
-
     syncing = true;
     try {
       MozeData.replaceState(data);
       setStatus('已同步 ✓', '#81c784');
-    } catch (e) {
-      console.warn('sync apply error', e);
-    }
-
+    } catch (e) { console.warn('sync apply error', e); }
     setTimeout(function () {
       syncing = false;
       if (typeof window.mozeRefreshAll === 'function') {
@@ -151,7 +159,6 @@ var MozeSync = (function () {
     pushTimer = setTimeout(pushNow, 800);
   }
 
-  /* ─── 公開 API ─── */
   return {
     initFirebase: initFirebase,
     signInWithGoogle: signInWithGoogle,
