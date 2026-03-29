@@ -41,6 +41,67 @@ a { color: var(--accent2); text-decoration: none; }
   font-size: 13px; text-align: center;
 }
 
+/* ─── 登入畫面 ─── */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg-body);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  text-align: center;
+  padding: 48px 40px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 380px;
+  width: 90vw;
+}
+
+.login-logo {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.login-subtitle {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.btn-google-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  background: #fff;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow .2s;
+}
+.btn-google-login:hover {
+  box-shadow: 0 2px 12px rgba(255,255,255,.15);
+}
+
+.login-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 18px;
+}
+
 /* ─── 版型 ─── */
 .app-layout {
   display: flex;

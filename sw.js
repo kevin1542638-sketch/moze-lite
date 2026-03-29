@@ -1,4 +1,4 @@
-const CACHE_NAME = 'moze-lite-v2';
+const CACHE_NAME = 'moze-lite-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,10 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  const url = e.request.url;
+  if (url.includes('gstatic.com') || url.includes('googleapis.com') || url.includes('firebaseio.com') || url.includes('firebaseapp.com')) {
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );

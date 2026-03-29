@@ -735,7 +735,10 @@
   /* ═══════════════════════════════════════ */
   /*           事件綁定                       */
   /* ═══════════════════════════════════════ */
+  let eventsBound = false;
   function bindEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
     /* 側欄導航 */
     $$el('.sidebar-nav .nav-item').forEach(n => {
       n.addEventListener('click', () => switchView(n.dataset.view));
@@ -1003,14 +1006,67 @@
   /* ─── 暴露 refreshAll 供同步模組呼叫 ─── */
   window.mozeRefreshAll = refreshAll;
 
-  /* ─── 啟動 ─── */
-  initRange();
-  bindEvents();
-  initUpcomingAccount();
-  refreshAll();
+  /* ─── 登入 / 登出 UI ─── */
+  function showApp(user) {
+    const loginScreen = $('login-screen');
+    const appLayout = $('app-layout');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (appLayout) appLayout.style.display = '';
 
-  /* ─── 啟動即時同步 ─── */
+    const avatar = $('user-avatar');
+    const userName = $('user-name');
+    if (user) {
+      if (avatar && user.photoURL) { avatar.src = user.photoURL; avatar.style.display = 'block'; }
+      if (userName) userName.textContent = user.displayName || user.email || '';
+    }
+
+    initRange();
+    bindEvents();
+    initUpcomingAccount();
+    refreshAll();
+  }
+
+  function showLogin() {
+    const loginScreen = $('login-screen');
+    const appLayout = $('app-layout');
+    if (loginScreen) loginScreen.style.display = '';
+    if (appLayout) appLayout.style.display = 'none';
+  }
+
+  /* ─── 登入按鈕 ─── */
+  const btnGoogleLogin = $('btn-google-login');
+  if (btnGoogleLogin) {
+    btnGoogleLogin.addEventListener('click', function () {
+      const hint = $('login-hint');
+      if (hint) hint.textContent = '正在跳轉…';
+      MozeSync.signInWithGoogle().catch(function (e) {
+        if (hint) hint.textContent = '登入失敗：' + e.message;
+      });
+    });
+  }
+
+  /* ─── 登出按鈕 ─── */
+  const btnLogout = $('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', function () {
+      MozeSync.signOut().then(function () { showLogin(); });
+    });
+  }
+
+  /* ─── 監聽登入狀態 ─── */
   if (typeof MozeSync !== 'undefined') {
-    MozeSync.init();
+    MozeSync.onAuthChanged(function (user) {
+      if (user) {
+        showApp(user);
+        MozeSync.startSync(user.uid);
+      } else {
+        showLogin();
+      }
+    });
+  } else {
+    initRange();
+    bindEvents();
+    initUpcomingAccount();
+    refreshAll();
   }
 })();
