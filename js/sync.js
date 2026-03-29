@@ -167,6 +167,20 @@ var MozeSync = (function () {
     pushTimer = setTimeout(pushNow, 800);
   }
 
+  function fetchUserCount(callback) {
+    if (!db) { callback(0, []); return; }
+    db.ref('users').once('value').then(function (snapshot) {
+      var data = snapshot.val();
+      if (!data) { callback(0, []); return; }
+      var uids = Object.keys(data);
+      callback(uids.length, uids);
+    }).catch(function () { callback(0, []); });
+  }
+
+  function getCurrentUser() {
+    return auth ? auth.currentUser : null;
+  }
+
   return {
     initFirebase: initFirebase,
     initGoogleSignIn: initGoogleSignIn,
@@ -175,5 +189,7 @@ var MozeSync = (function () {
     startSync: startSync,
     stopSync: stopSync,
     setStatus: setStatus,
+    fetchUserCount: fetchUserCount,
+    getCurrentUser: getCurrentUser,
   };
 })();

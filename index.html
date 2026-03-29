@@ -388,6 +388,20 @@
             <input type="file" id="import-file" accept=".json" style="display:none">
           </div>
         </div>
+        <div class="settings-section" id="admin-panel" style="display:none">
+          <h3>🔒 製作人員面板</h3>
+          <div class="card" style="padding:16px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <span style="font-size:28px">👥</span>
+              <div>
+                <div style="color:var(--text-dim);font-size:12px">註冊人數</div>
+                <div id="admin-user-count" style="font-size:24px;font-weight:700;color:var(--accent)">—</div>
+              </div>
+            </div>
+            <div id="admin-user-list" style="font-size:12px;color:var(--text-dim);max-height:200px;overflow-y:auto"></div>
+          </div>
+          <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">此區塊僅管理員可見</div>
+        </div>
       </div>
 
     </div><!-- end view-container -->

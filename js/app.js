@@ -550,6 +550,8 @@
   /* ═══════════════════════════════════════ */
   /*             ⑦ 設定頁                    */
   /* ═══════════════════════════════════════ */
+  const ADMIN_EMAIL = 'kevin1542638@gmail.com';
+
   function renderSettings() {
     const s = MozeData.getState();
     const liabInput = $('settings-liabilities');
@@ -571,6 +573,21 @@
           renderSettings();
         });
       });
+    }
+
+    const adminPanel = $('admin-panel');
+    if (!adminPanel) return;
+    const user = typeof MozeSync !== 'undefined' ? MozeSync.getCurrentUser() : null;
+    if (user && user.email === ADMIN_EMAIL) {
+      adminPanel.style.display = '';
+      MozeSync.fetchUserCount(function (count, uids) {
+        const countEl = $('admin-user-count');
+        if (countEl) countEl.textContent = count;
+        const listEl = $('admin-user-list');
+        if (listEl) listEl.textContent = '使用者 UID：' + uids.join(', ');
+      });
+    } else {
+      adminPanel.style.display = 'none';
     }
   }
 
