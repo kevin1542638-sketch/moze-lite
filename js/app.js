@@ -579,21 +579,21 @@
     const adminPanel = $('admin-panel');
     if (!adminPanel) return;
     let email = '';
-    if (currentUser) {
+    if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+      email = firebase.auth().currentUser.email || '';
+    } else if (currentUser) {
       email = currentUser.email || '';
-      if (!email && currentUser.providerData && currentUser.providerData.length) {
-        email = currentUser.providerData[0].email || '';
-      }
     }
-    console.log('[admin check] email:', email, 'expect:', ADMIN_EMAIL);
     if (email.toLowerCase() === ADMIN_EMAIL) {
       adminPanel.style.display = '';
-      MozeSync.fetchUserCount(function (count, uids) {
-        const countEl = $('admin-user-count');
-        if (countEl) countEl.textContent = count;
-        const listEl = $('admin-user-list');
-        if (listEl) listEl.textContent = '使用者 UID：' + uids.join(', ');
-      });
+      if (typeof MozeSync !== 'undefined') {
+        MozeSync.fetchUserCount(function (count, uids) {
+          const countEl = $('admin-user-count');
+          if (countEl) countEl.textContent = count;
+          const listEl = $('admin-user-list');
+          if (listEl) listEl.textContent = '使用者 UID：' + uids.join(', ');
+        });
+      }
     } else {
       adminPanel.style.display = 'none';
     }

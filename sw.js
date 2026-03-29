@@ -1,4 +1,4 @@
-const CACHE_NAME = 'moze-lite-v5';
+const CACHE_NAME = 'moze-lite-v6';
 const ASSETS = [
   './',
   './index.html',
