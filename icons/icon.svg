@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#111114"/>
+  <rect x="40" y="40" width="432" height="432" rx="72" fill="#1e1e24"/>
+  <text x="256" y="200" text-anchor="middle" font-size="80" font-weight="bold" fill="#f6c342" font-family="sans-serif">MOZE</text>
+  <text x="256" y="270" text-anchor="middle" font-size="40" fill="#8e8e96" font-family="sans-serif">Lite</text>
+  <rect x="120" y="310" width="100" height="16" rx="8" fill="#e57373" opacity="0.8"/>
+  <rect x="120" y="340" width="160" height="16" rx="8" fill="#4fc3f7" opacity="0.8"/>
+  <rect x="120" y="370" width="70" height="16" rx="8" fill="#81c784" opacity="0.8"/>
+  <circle cx="370" cy="350" r="50" fill="none" stroke="#f6c342" stroke-width="14" stroke-dasharray="100 220" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="370" cy="350" r="50" fill="none" stroke="#4fc3f7" stroke-width="14" stroke-dasharray="70 220" stroke-dashoffset="-100" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="370" cy="350" r="50" fill="none" stroke="#81c784" stroke-width="14" stroke-dasharray="40 220" stroke-dashoffset="-170" stroke-linecap="round" opacity="0.9"/>
+</svg>

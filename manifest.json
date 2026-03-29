@@ -1,0 +1,24 @@
+{
+  "name": "MOZE Lite 記帳",
+  "short_name": "MOZE Lite",
+  "description": "本地離線記帳應用，支援多帳戶、報表與預算管理",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111114",
+  "theme_color": "#111114",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
