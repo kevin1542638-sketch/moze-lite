@@ -628,6 +628,20 @@ const MozeData = (() => {
     save();
   }
 
+  function resetLocalData() {
+    state = blank();
+    save();
+  }
+
+  function hasMeaningfulData() {
+    if (!state) return false;
+    if (state.transactions.length || state.projects.length || state.budgets.length || state.upcoming.length) return true;
+    if ((state.settings && parseFloat(state.settings.liabilities)) || 0) return true;
+    if (JSON.stringify(state.accounts) !== JSON.stringify(DEFAULT_ACCOUNTS)) return true;
+    if (JSON.stringify(state.categories) !== JSON.stringify(DEFAULT_CATEGORIES)) return true;
+    return false;
+  }
+
   load();
 
   return {
@@ -645,6 +659,8 @@ const MozeData = (() => {
     txByDateGroups, searchTx, datesWithTx,
     exportJSON, importJSON,
     setActiveAccount, setSelectedAccount, setLiabilities,
+    resetLocalData,
+    hasMeaningfulData,
     formatMoney, monthKey, addMonths, parseMonth, monthRange, daysInMonth, today, uid,
     CHART_COLORS, ACCOUNT_GROUPS,
   };

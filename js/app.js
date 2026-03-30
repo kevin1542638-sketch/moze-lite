@@ -27,6 +27,98 @@
   let selectedProjectId = '';
   let reportRange = 1;
   let currentUser = null;
+  let globalErrorBound = false;
+
+  function openAuthModal() {
+    const overlay = $('auth-modal-overlay');
+    if (overlay) overlay.classList.add('open');
+    if (typeof MozeSync !== 'undefined') MozeSync.initGoogleSignIn();
+    updateAuthPanel();
+  }
+
+  function closeAuthModal() {
+    const overlay = $('auth-modal-overlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  function updateAuthPanel() {
+    const isLoggedIn = !!currentUser;
+    const isAdmin = typeof MozeSync !== 'undefined' && typeof MozeSync.isAdmin === 'function' && MozeSync.isAdmin(currentUser);
+    const userName = $('user-name');
+    const userAvatar = $('user-avatar');
+    const triggerBtn = $('btn-open-auth-modal');
+    const localWarning = $('local-mode-warning');
+    const modeLabel = $('auth-mode-label');
+    const modeCopy = $('auth-mode-copy');
+    const guestBtn = $('btn-continue-guest');
+    const signOutBtn = $('btn-sign-out');
+    const deleteUserBtn = $('btn-delete-user-account');
+    const errorNav = $('nav-errorlogs');
+
+    if (userName) userName.textContent = isLoggedIn ? (currentUser.displayName || currentUser.email || '已登入') : '本機模式';
+    if (triggerBtn) triggerBtn.textContent = isLoggedIn ? '帳號' : '連線';
+
+    if (userAvatar) {
+      if (isLoggedIn && currentUser.photoURL) {
+        userAvatar.src = currentUser.photoURL;
+        userAvatar.style.display = 'block';
+      } else {
+        userAvatar.removeAttribute('src');
+        userAvatar.style.display = 'none';
+      }
+    }
+
+    if (modeLabel) modeLabel.textContent = isLoggedIn ? '目前為 Google 雲端同步模式' : '目前為本機模式';
+    if (modeCopy) modeCopy.textContent = isLoggedIn
+      ? '已登入後，資料會同步到你的 Firebase 帳號空間。登出後會停留在本機模式。'
+      : '未登入時資料只會留在這台裝置，不會同步到雲端。';
+    if (guestBtn) guestBtn.style.display = isLoggedIn ? 'none' : '';
+    if (signOutBtn) signOutBtn.style.display = isLoggedIn ? '' : 'none';
+    if (deleteUserBtn) deleteUserBtn.style.display = isLoggedIn ? '' : 'none';
+    if (errorNav) errorNav.style.display = isAdmin ? '' : 'none';
+    if (localWarning) localWarning.style.display = isLoggedIn ? 'none' : '';
+    if (!isAdmin && currentView === 'errorlogs') switchView('overview');
+  }
+
+  function formatErrorLogTime(isoText) {
+    if (!isoText) return '';
+    const d = new Date(isoText);
+    if (Number.isNaN(d.getTime())) return esc(isoText);
+    return d.toLocaleString('zh-TW');
+  }
+
+  function recordClientError(payload) {
+    if (typeof MozeSync !== 'undefined' && typeof MozeSync.logError === 'function') {
+      MozeSync.logError(payload);
+      return;
+    }
+    if (typeof MozeTelemetry !== 'undefined' && typeof MozeTelemetry.captureError === 'function') {
+      MozeTelemetry.captureError(payload);
+    }
+  }
+
+  function bindGlobalErrorHandlers() {
+    if (globalErrorBound) return;
+    globalErrorBound = true;
+
+    window.addEventListener('error', function (event) {
+      recordClientError({
+        source: 'window.onerror',
+        message: event && event.message ? event.message : 'Unhandled error',
+        stack: event && event.error && event.error.stack ? event.error.stack : '',
+        context: event && event.filename ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}` : '',
+      });
+    });
+
+    window.addEventListener('unhandledrejection', function (event) {
+      const reason = event && event.reason;
+      recordClientError({
+        source: 'unhandledrejection',
+        message: reason && reason.message ? reason.message : String(reason || 'Promise rejected'),
+        stack: reason && reason.stack ? reason.stack : '',
+      });
+    });
+  }
 
   function initRange() {
     const t = MozeData.today();
@@ -48,7 +140,7 @@
     if (target) target.classList.add('active');
     $$el('.sidebar-nav .nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
     $$el('.bottom-nav .bnav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
-    const titles = { overview: '概覽', accounts: '帳戶', ledger: '流水帳', reports: '報表', projects: '專案', search: '搜尋', settings: '設定' };
+    const titles = { overview: '概覽', accounts: '帳戶', ledger: '流水帳', reports: '報表', projects: '專案', search: '搜尋', errorlogs: '報錯日誌', settings: '設定' };
     const tt = $('topbar-title');
     if (tt) tt.textContent = titles[name] || name;
     refreshCurrentView();
@@ -59,6 +151,11 @@
     try {
       refreshCurrentView();
     } catch (e) {
+      recordClientError({
+        source: 'app.refreshAll',
+        message: e && e.message ? e.message : 'refreshAll failed',
+        stack: e && e.stack ? e.stack : '',
+      });
       console.warn('refreshAll:', e.message);
     }
   }
@@ -71,6 +168,7 @@
       case 'reports': renderReports(); break;
       case 'projects': renderProjects(); break;
       case 'search': renderSearch(); break;
+      case 'errorlogs': renderErrorLogs(); break;
       case 'settings': renderSettings(); break;
     }
   }
@@ -554,6 +652,70 @@
     bindTxDelete(results);
   }
 
+  function renderErrorLogs() {
+    const isAdmin = typeof MozeSync !== 'undefined' && typeof MozeSync.isAdmin === 'function' && MozeSync.isAdmin(currentUser);
+    const countEl = $('error-log-count');
+    const statusEl = $('error-log-status');
+    const listEl = $('error-log-list');
+
+    if (!countEl || !statusEl || !listEl) return;
+
+    if (!isAdmin) {
+      countEl.textContent = '0';
+      statusEl.textContent = '僅管理員帳號可查看此頁面。';
+      listEl.innerHTML = '<div class="empty-state"><p>你沒有權限查看報錯日誌。</p></div>';
+      return;
+    }
+
+    statusEl.textContent = '讀取中…';
+    if (typeof MozeSync === 'undefined' || typeof MozeSync.fetchErrorLogs !== 'function') {
+      countEl.textContent = '0';
+      statusEl.textContent = '報錯日誌模組未載入。';
+      listEl.innerHTML = '<div class="empty-state"><p>無法讀取報錯日誌。</p></div>';
+      return;
+    }
+
+    MozeSync.fetchErrorLogs(function (err, logs) {
+      if (err) {
+        countEl.textContent = '0';
+        statusEl.textContent = '讀取失敗，請稍後再試。';
+        listEl.innerHTML = '<div class="empty-state"><p>無法讀取報錯日誌。</p></div>';
+        return;
+      }
+
+      countEl.textContent = logs.length;
+      let statusText = logs.length ? '僅管理員帳號可查看與清空。' : '目前沒有報錯紀錄。';
+      if (typeof MozeTelemetry !== 'undefined' && typeof MozeTelemetry.getStatus === 'function') {
+        const telemetryStatus = MozeTelemetry.getStatus();
+        statusText += ` Sentry：${telemetryStatus.detail}。`;
+      }
+      statusEl.textContent = statusText;
+      if (!logs.length) {
+        listEl.innerHTML = '<div class="empty-state"><p>目前沒有報錯紀錄。</p></div>';
+        return;
+      }
+
+      listEl.className = 'error-log-list';
+      listEl.innerHTML = logs.map(function (log) {
+        const meta = [];
+        if (log.level) meta.push(`<span>層級：${esc(log.level)}</span>`);
+        if (log.url) meta.push(`<span>頁面：${esc(log.url)}</span>`);
+        if (log.context) meta.push(`<span>上下文：${esc(log.context)}</span>`);
+        return `
+          <div class="error-log-item">
+            <div class="error-log-item-header">
+              <div class="error-log-source">${esc(log.source || 'app')}</div>
+              <div class="error-log-time">${esc(formatErrorLogTime(log.createdAt))}</div>
+            </div>
+            <div class="error-log-message">${esc(log.message || 'Unknown error')}</div>
+            ${meta.length ? `<div class="error-log-meta">${meta.join('')}</div>` : ''}
+            ${log.stack ? `<pre class="error-log-stack">${esc(log.stack)}</pre>` : ''}
+          </div>
+        `;
+      }).join('');
+    });
+  }
+
   /* ═══════════════════════════════════════ */
   /*             ⑦ 設定頁                    */
   /* ═══════════════════════════════════════ */
@@ -981,6 +1143,66 @@
 
     const btnSaveTx = $('btn-save-tx');
     if (btnSaveTx) btnSaveTx.addEventListener('click', saveTransaction);
+
+    const btnOpenAuth = $('btn-open-auth-modal');
+    if (btnOpenAuth) btnOpenAuth.addEventListener('click', openAuthModal);
+    const btnOpenAuthFab = $('btn-open-auth-fab');
+    if (btnOpenAuthFab) btnOpenAuthFab.addEventListener('click', openAuthModal);
+    const authClose = $('auth-modal-close');
+    if (authClose) authClose.addEventListener('click', closeAuthModal);
+    const authOverlay = $('auth-modal-overlay');
+    if (authOverlay) authOverlay.addEventListener('click', (e) => {
+      if (e.target === authOverlay) closeAuthModal();
+    });
+    const btnGuest = $('btn-continue-guest');
+    if (btnGuest) btnGuest.addEventListener('click', closeAuthModal);
+    const btnSignOut = $('btn-sign-out');
+    if (btnSignOut) {
+      btnSignOut.addEventListener('click', function () {
+        MozeSync.signOut().then(function () {
+          closeAuthModal();
+          showApp(null);
+        });
+      });
+    }
+    const btnDeleteUser = $('btn-delete-user-account');
+    if (btnDeleteUser) {
+      btnDeleteUser.addEventListener('click', function () {
+        if (!currentUser) return;
+        const ok = window.confirm(
+          '刪除後會移除這個 Google/Firebase 帳號在雲端的記帳資料，且無法復原。\n\n確定要刪除帳號與雲端資料嗎？'
+        );
+        if (!ok) return;
+        MozeSync.deleteUserAccount().then(function () {
+          MozeData.resetLocalData();
+          closeAuthModal();
+          showApp(null);
+        }).catch(function (err) {
+          if (!err) return;
+          if (err.code === 'auth/requires-recent-login') {
+            alert('此操作需要重新登入。請先登出，再重新用 Google 登入後再試一次。');
+          } else {
+            alert('刪除帳號失敗：' + (err.message || err.code || 'unknown error'));
+          }
+        });
+      });
+    }
+
+    const btnRefreshErrorLogs = $('btn-refresh-errorlogs');
+    if (btnRefreshErrorLogs) btnRefreshErrorLogs.addEventListener('click', renderErrorLogs);
+    const btnClearErrorLogs = $('btn-clear-errorlogs');
+    if (btnClearErrorLogs) {
+      btnClearErrorLogs.addEventListener('click', function () {
+        const isAdmin = typeof MozeSync !== 'undefined' && typeof MozeSync.isAdmin === 'function' && MozeSync.isAdmin(currentUser);
+        if (!isAdmin) return;
+        if (!window.confirm('確定要清空所有報錯日誌嗎？')) return;
+        MozeSync.clearErrorLogs().then(function () {
+          renderErrorLogs();
+        }).catch(function (err) {
+          alert('清空失敗：' + (err && (err.message || err.code) ? (err.message || err.code) : 'unknown error'));
+        });
+      });
+    }
   }
 
   /* ─── 區間操作 ─── */
@@ -1040,37 +1262,28 @@
   /* ─── 登入 / 登出 UI ─── */
   function showApp(user) {
     currentUser = user || null;
-    const loginScreen = $('login-screen');
     const appLayout = $('app-layout');
-    if (loginScreen) loginScreen.style.display = 'none';
     if (appLayout) appLayout.style.display = '';
 
-    const avatar = $('user-avatar');
-    const userName = $('user-name');
-    if (user) {
-      if (avatar && user.photoURL) { avatar.src = user.photoURL; avatar.style.display = 'block'; }
-      if (userName) userName.textContent = user.displayName || user.email || '';
+    updateAuthPanel();
+    if (typeof MozeSync !== 'undefined') {
+      MozeSync.setStatus(user ? '雲端同步中…' : '本機模式（未同步）', user ? '#f6c342' : '#8e8e96');
+    }
+    if (typeof MozeTelemetry !== 'undefined') {
+      if (typeof MozeTelemetry.init === 'function') MozeTelemetry.init();
+      if (typeof MozeTelemetry.setUser === 'function') MozeTelemetry.setUser(user || null);
+      if (typeof MozeTelemetry.setTag === 'function') MozeTelemetry.setTag('auth_mode', user ? 'cloud' : 'local');
     }
 
     initRange();
     bindEvents();
+    bindGlobalErrorHandlers();
     initUpcomingAccount();
     refreshAll();
   }
 
   function showLogin() {
-    const loginScreen = $('login-screen');
-    const appLayout = $('app-layout');
-    if (loginScreen) loginScreen.style.display = '';
-    if (appLayout) appLayout.style.display = 'none';
-  }
-
-  /* ─── 登出按鈕 ─── */
-  const btnLogout = $('btn-logout');
-  if (btnLogout) {
-    btnLogout.addEventListener('click', function () {
-      MozeSync.signOut().then(function () { showLogin(); });
-    });
+    showApp(null);
   }
 
   /* ─── 監聽登入狀態 + 初始化 GIS 按鈕 ─── */
@@ -1079,9 +1292,9 @@
       if (user) {
         showApp(user);
         MozeSync.startSync(user.uid);
+        closeAuthModal();
       } else {
-        showLogin();
-        MozeSync.initGoogleSignIn();
+        showApp(null);
       }
     });
   } else {

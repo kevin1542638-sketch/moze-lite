@@ -18,17 +18,7 @@
 <!-- 錯誤橫幅 -->
 <div id="error-banner"></div>
 
-<!-- ===== 登入畫面 ===== -->
-<div class="login-screen" id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">吃土防禦術</div>
-    <p class="login-subtitle">個人記帳，多裝置同步</p>
-    <div id="google-signin-btn" style="display:inline-block"></div>
-    <p class="login-hint" id="login-hint"></p>
-  </div>
-</div>
-
-<div class="app-layout" id="app-layout" style="display:none">
+<div class="app-layout" id="app-layout">
 
   <!-- ===== 側欄 ===== -->
   <aside class="sidebar">
@@ -52,6 +42,9 @@
       <div class="nav-item" data-view="search">
         <span class="nav-icon">🔍</span> 搜尋
       </div>
+      <div class="nav-item" data-view="errorlogs" id="nav-errorlogs" style="display:none">
+        <span class="nav-icon">🚨</span> 報錯日誌
+      </div>
       <div class="nav-item" data-view="settings">
         <span class="nav-icon">⚙️</span> 設定
       </div>
@@ -60,7 +53,7 @@
       <div id="user-info" style="display:flex;align-items:center;gap:8px;padding:0 4px 8px;font-size:12px;color:var(--text-dim)">
         <img id="user-avatar" src="" alt="" style="width:24px;height:24px;border-radius:50%;display:none">
         <span id="user-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-        <button class="btn-icon" id="btn-logout" title="登出" style="font-size:14px">登出</button>
+        <button class="btn btn-secondary btn-sm" id="btn-open-auth-modal" type="button">連線</button>
       </div>
       <div id="sync-status" style="font-size:11px;color:#8e8e96;text-align:center;padding:0 0 8px;"></div>
       <button class="btn-add-tx" id="btn-open-modal">＋ 新增交易</button>
@@ -80,6 +73,9 @@
         <input type="date" id="range-end">
         <button id="range-next" title="下一段">▶</button>
       </div>
+    </div>
+    <div class="local-mode-warning" id="local-mode-warning" style="display:none">
+      本機模式資料只保存在目前裝置。若稍後登入的 Google 帳戶已經有雲端資料，選擇覆蓋時會讓其中一邊資料被取代而消失。
     </div>
 
     <!-- 視圖容器 -->
@@ -357,7 +353,26 @@
         <div id="search-results"></div>
       </div>
 
-      <!-- ⑦ 設定頁 -->
+      <!-- ⑦ 報錯日誌頁 -->
+      <div class="view" id="view-errorlogs">
+        <div class="card">
+          <div class="card-title">報錯日誌</div>
+          <div class="error-log-toolbar">
+            <div>
+              <div class="error-log-count-label">總筆數</div>
+              <div class="error-log-count" id="error-log-count">0</div>
+            </div>
+            <div class="error-log-actions">
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-errorlogs" type="button">重新整理</button>
+              <button class="btn btn-danger btn-sm" id="btn-clear-errorlogs" type="button">清空</button>
+            </div>
+          </div>
+          <div id="error-log-status" class="error-log-status">僅管理員帳號可查看此頁面。</div>
+          <div id="error-log-list"></div>
+        </div>
+      </div>
+
+      <!-- ⑧ 設定頁 -->
       <div class="view" id="view-settings">
         <div class="settings-section">
           <h3>總負債金額</h3>
@@ -427,6 +442,28 @@
   </button>
 </nav>
 <button class="fab-add" id="fab-add-tx" title="新增交易">＋</button>
+<button class="auth-fab" id="btn-open-auth-fab" type="button">連線</button>
+
+<!-- ===== 登入 / 模式浮窗 ===== -->
+<div class="auth-popover-overlay" id="auth-modal-overlay">
+  <div class="auth-popover">
+    <div class="auth-popover-header">
+      <div>
+        <div class="auth-popover-title">同步與登入</div>
+        <div class="auth-popover-subtitle" id="auth-mode-label">目前為本機模式</div>
+      </div>
+      <button class="modal-close" id="auth-modal-close" type="button">✕</button>
+    </div>
+    <div class="auth-popover-body">
+      <p class="auth-popover-copy" id="auth-mode-copy">未登入時資料只會留在這台裝置，不會同步到雲端。</p>
+      <div id="google-signin-btn"></div>
+      <button class="btn btn-secondary btn-block" id="btn-continue-guest" type="button">繼續使用本機模式</button>
+      <button class="btn btn-danger btn-block" id="btn-sign-out" type="button" style="display:none">登出並切回本機模式</button>
+      <button class="btn btn-danger btn-block" id="btn-delete-user-account" type="button" style="display:none">刪除雲端帳號與資料</button>
+      <p class="login-hint" id="login-hint"></p>
+    </div>
+  </div>
+</div>
 
 <!-- ===== 新增交易彈窗 ===== -->
 <div class="modal-overlay" id="tx-modal-overlay">
@@ -522,8 +559,19 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
 <!-- ===== 載入 JS ===== -->
+<script>
+window.MOZE_APP_CONFIG = window.MOZE_APP_CONFIG || {
+  sentry: {
+    dsn: '',
+    environment: location.hostname === 'localhost' ? 'local' : 'production',
+    release: 'moze-lite-local',
+    tracesSampleRate: 0,
+  }
+};
+</script>
 <script src="js/data.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/telemetry.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 <script>
