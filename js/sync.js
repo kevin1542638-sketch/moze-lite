@@ -14,6 +14,7 @@ var MozeSync = (function () {
   var ADMIN_EMAIL = 'kevin1542638@gmail.com';
   var ERROR_LOG_BUFFER_KEY = 'moze-lite-error-log-buffer-v1';
   var ERROR_LOG_LIMIT = 50;
+  var LAST_SYNCED_UID_KEY = 'moze-lite-last-synced-uid-v1';
 
   var auth = null;
   var db = null;
@@ -79,6 +80,23 @@ var MozeSync = (function () {
     var entries = readBufferedErrorLogs();
     entries.push(entry);
     saveBufferedErrorLogs(entries);
+  }
+
+  function getLastSyncedUid() {
+    try {
+      return localStorage.getItem(LAST_SYNCED_UID_KEY) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setLastSyncedUid(uid) {
+    try {
+      if (uid) localStorage.setItem(LAST_SYNCED_UID_KEY, uid);
+      else localStorage.removeItem(LAST_SYNCED_UID_KEY);
+    } catch (e) {
+      console.warn('setLastSyncedUid failed', e);
+    }
   }
 
   function sendToTelemetry(entry) {
@@ -199,6 +217,7 @@ var MozeSync = (function () {
   /* ─── 登出 ─── */
   function signOut() {
     stopSync();
+    setLastSyncedUid('');
     if (typeof google !== 'undefined' && google.accounts) {
       google.accounts.id.disableAutoSelect();
     }
@@ -224,6 +243,7 @@ var MozeSync = (function () {
     ]).then(function () {
       return user.delete();
     }).then(function () {
+      setLastSyncedUid('');
       if (typeof google !== 'undefined' && google.accounts) {
         google.accounts.id.disableAutoSelect();
       }
@@ -275,8 +295,9 @@ var MozeSync = (function () {
       var localState = MozeData.getState();
       var hasLocalData = typeof MozeData.hasMeaningfulData === 'function' && MozeData.hasMeaningfulData();
       var stateDiffers = !!remote && JSON.stringify(remote) !== JSON.stringify(localState);
+      var isReturningSyncedUser = getLastSyncedUid() === uid;
       if (remote) {
-        if (hasLocalData && stateDiffers) {
+        if (hasLocalData && stateDiffers && !isReturningSyncedUser) {
           var useLocal = window.confirm(
             '這個 Google 帳戶已經有雲端資料。\n\n按「確定」：用目前本機資料覆蓋雲端。\n按「取消」：用雲端資料覆蓋目前本機資料。'
           );
@@ -286,6 +307,7 @@ var MozeSync = (function () {
             syncing = true;
             MozeData.replaceState(remote);
             syncing = false;
+            setLastSyncedUid(uid);
             if (typeof window.mozeRefreshAll === 'function') {
               try { window.mozeRefreshAll(); } catch (e) { console.warn(e); }
             }
@@ -295,6 +317,7 @@ var MozeSync = (function () {
           syncing = true;
           MozeData.replaceState(remote);
           syncing = false;
+          setLastSyncedUid(uid);
           if (typeof window.mozeRefreshAll === 'function') {
             try { window.mozeRefreshAll(); } catch (e) { console.warn(e); }
           }
@@ -346,7 +369,9 @@ var MozeSync = (function () {
     syncing = true;
     setStatus('同步中…', '#f6c342');
     dataRef.set(JSON.parse(JSON.stringify(state))).then(function () {
-      syncing = false; setStatus('已同步 ✓', '#81c784');
+      syncing = false;
+      setLastSyncedUid(auth && auth.currentUser ? auth.currentUser.uid : '');
+      setStatus('已同步 ✓', '#81c784');
     }).catch(function () {
       syncing = false; setStatus('同步失敗', '#e57373');
       logError({

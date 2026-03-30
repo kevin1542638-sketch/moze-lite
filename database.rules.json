@@ -62,7 +62,7 @@
     "userIndex": {
       ".read": "auth != null && auth.token.email === 'kevin1542638@gmail.com'",
       "$uid": {
-        ".write": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && ($uid === auth.uid || auth.token.email === 'kevin1542638@gmail.com')",
         ".validate": "newData.val() === true"
       }
     },
