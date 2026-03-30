@@ -2,8 +2,15 @@
   "rules": {
     "users": {
       "$uid": {
-        ".read": "$uid === auth.uid",
-        ".write": "$uid === auth.uid"
+        ".read": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && $uid === auth.uid"
+      }
+    },
+    "userIndex": {
+      ".read": "auth != null && auth.token.email === 'kevin1542638@gmail.com'",
+      "$uid": {
+        ".write": "auth != null && $uid === auth.uid",
+        ".validate": "newData.val() === true"
       }
     },
     ".read": false,

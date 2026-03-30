@@ -11,10 +11,12 @@ var MozeSync = (function () {
   };
 
   var GOOGLE_CLIENT_ID = '721616309882-7o6u74re11djphai6j0dgpq42ki3agtr.apps.googleusercontent.com';
+  var ADMIN_EMAIL = 'kevin1542638@gmail.com';
 
   var auth = null;
   var db = null;
   var dataRef = null;
+  var userIndexRef = null;
   var syncing = false;
   var pushTimer = null;
   var statusEl = null;
@@ -102,7 +104,14 @@ var MozeSync = (function () {
   function startSync(uid) {
     if (dataRef) stopSync();
     dataRef = db.ref('users/' + uid + '/moze-data');
+    userIndexRef = db.ref('userIndex/' + uid);
     setStatus('連線中…', '#f6c342');
+
+    // Keep a minimal per-user index so the admin panel can count users
+    // without needing read access to every user's private accounting data.
+    userIndexRef.set(true).catch(function (err) {
+      console.warn('user index sync failed', err);
+    });
 
     dataRef.once('value').then(function (snapshot) {
       var remote = snapshot.val();
@@ -131,6 +140,7 @@ var MozeSync = (function () {
 
   function stopSync() {
     if (dataRef) { try { dataRef.off(); } catch (e) {} dataRef = null; }
+    userIndexRef = null;
   }
 
   function onRemoteChange(snapshot) {
@@ -169,12 +179,20 @@ var MozeSync = (function () {
 
   function fetchUserCount(callback) {
     if (!db) { callback(0, []); return; }
-    db.ref('users').once('value').then(function (snapshot) {
+    db.ref('userIndex').once('value').then(function (snapshot) {
       var data = snapshot.val();
       if (!data) { callback(0, []); return; }
       var uids = Object.keys(data);
       callback(uids.length, uids);
-    }).catch(function () { callback(0, []); });
+    }).catch(function (err) {
+      console.warn('fetchUserCount failed', err);
+      callback(0, []);
+    });
+  }
+
+  function isAdmin(user) {
+    var email = user && user.email ? String(user.email).toLowerCase() : '';
+    return !!email && email === ADMIN_EMAIL;
   }
 
   function getCurrentUser() {
@@ -191,5 +209,6 @@ var MozeSync = (function () {
     setStatus: setStatus,
     fetchUserCount: fetchUserCount,
     getCurrentUser: getCurrentUser,
+    isAdmin: isAdmin,
   };
 })();
